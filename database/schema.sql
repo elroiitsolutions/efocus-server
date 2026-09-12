@@ -63,6 +63,7 @@ CREATE TABLE `products` (
   `key_spec_3` VARCHAR(255) NULL,
   `image_status` VARCHAR(50) NULL,
   `rfq_eligible` BOOLEAN DEFAULT TRUE,
+  `stock_status` ENUM('in_stock', 'out_of_stock', 'on_backorder') DEFAULT 'in_stock',
   `is_active` BOOLEAN DEFAULT TRUE,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -73,6 +74,7 @@ CREATE TABLE `products` (
 
 -- Indexes for Products
 CREATE INDEX `idx_products_category_id` ON `products` (`category_id`);
+CREATE INDEX `idx_products_stock_status` ON `products` (`stock_status`);
 CREATE INDEX `idx_products_subcategory_id` ON `products` (`subcategory_id`);
 CREATE INDEX `idx_products_family_id` ON `products` (`family_id`);
 CREATE INDEX `idx_products_sku` ON `products` (`sku`);
