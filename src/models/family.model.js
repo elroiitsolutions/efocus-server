@@ -3,11 +3,14 @@ const { pool } = require('../config/database');
 class FamilyModel {
   static async findAll() {
     const query = `
-      SELECT pf.*, s.name AS subcategory_name, c.name AS category_name, c.id AS category_id
+      SELECT pf.*, s.name AS subcategory_name, c.name AS category_name, c.id AS category_id,
+             COUNT(p.id) AS product_count
       FROM product_families pf
       INNER JOIN subcategories s ON pf.subcategory_id = s.id
       INNER JOIN categories c ON s.category_id = c.id
-      ORDER BY c.priority ASC, s.name ASC, pf.name ASC
+      LEFT JOIN products p ON p.family_id = pf.id
+      GROUP BY pf.id
+      ORDER BY c.priority DESC, c.category_no ASC, s.name ASC, pf.name ASC
     `;
     const [rows] = await pool.query(query);
     return rows;

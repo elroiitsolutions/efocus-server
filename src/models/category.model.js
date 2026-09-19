@@ -7,7 +7,7 @@ class CategoryModel {
        FROM categories c
        LEFT JOIN products p ON p.category_id = c.id
        GROUP BY c.id
-       ORDER BY c.priority ASC, c.name ASC`
+       ORDER BY c.priority DESC, c.category_no ASC, c.name ASC`
     );
     return rows;
   }
@@ -66,7 +66,7 @@ class CategoryModel {
              s.id AS subcategory_id, s.name AS subcategory_name, s.description AS subcategory_description
       FROM categories c
       LEFT JOIN subcategories s ON s.category_id = c.id
-      ORDER BY c.priority ASC, c.name ASC, s.name ASC
+      ORDER BY c.priority DESC, c.category_no ASC, s.name ASC
     `;
     const [catRows] = await pool.query(categoriesQuery);
 
@@ -104,6 +104,16 @@ class CategoryModel {
     `;
     const [subProdRows] = await pool.query(subcategoryProductsQuery);
 
+    // 3.5. Get product families for each subcategory
+    const familiesQuery = `
+      SELECT pf.id, pf.subcategory_id, pf.name, COUNT(p.id) AS product_count
+      FROM product_families pf
+      LEFT JOIN products p ON p.family_id = pf.id
+      GROUP BY pf.id
+      ORDER BY pf.name ASC
+    `;
+    const [familyRows] = await pool.query(familiesQuery);
+
     // 4. Assemble the tree
     const categoriesMap = new Map();
 
@@ -128,9 +138,31 @@ class CategoryModel {
             id: row.subcategory_id,
             name: row.subcategory_name,
             description: row.subcategory_description,
+            families: [],
             featured_products: []
           });
         }
+      }
+    }
+
+    // Map subcategories for easy access
+    const subcategoriesMap = new Map();
+    for (const cat of categoriesMap.values()) {
+      for (const sub of cat.subcategories) {
+        subcategoriesMap.set(sub.id, sub);
+      }
+    }
+
+    // Attach product families to their subcategories
+    for (const fam of familyRows) {
+      const sub = subcategoriesMap.get(fam.subcategory_id);
+      if (sub) {
+        if (!sub.families) sub.families = [];
+        sub.families.push({
+          id: fam.id,
+          name: fam.name,
+          product_count: fam.product_count
+        });
       }
     }
 
@@ -144,14 +176,6 @@ class CategoryModel {
           product_name: prod.product_name,
           brand: prod.brand
         });
-      }
-    }
-
-    // Map subcategories for easy access
-    const subcategoriesMap = new Map();
-    for (const cat of categoriesMap.values()) {
-      for (const sub of cat.subcategories) {
-        subcategoriesMap.set(sub.id, sub);
       }
     }
 

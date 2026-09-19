@@ -168,6 +168,10 @@ class FilterService {
     await FilterModel.deleteFilter(id);
     return true;
   }
+
+  static async getFiltersByContext(query) {
+    return await FilterModel.findFiltersByContext(query);
+  }
 }
 
 module.exports = FilterService;
