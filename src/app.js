@@ -18,7 +18,7 @@ const app = express();
 
 // Security Middlewares
 app.use(helmet());
-app.use(cors());
+app.use(cors("*"));
 
 // Rate Limiting (Capped at 100 requests per 15 minutes per IP)
 const limiter = rateLimit({
