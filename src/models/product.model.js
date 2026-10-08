@@ -1,7 +1,7 @@
 const { pool } = require('../config/database');
 
 class ProductModel {
-  static async findAndCount({ search, category, subcategory, family, brand, limit, offset }) {
+  static async findAndCount({ search, category, subcategory, family, brand, stock_status, filter_options, limit, offset }) {
     let selectSql = `
       SELECT p.*, 
              c.name AS category_name, c.category_no AS category_no,
@@ -123,10 +123,26 @@ class ProductModel {
       subcatNames = [...new Set(subcatNames)];
     }
 
-    // Parse brand terms
+    // Parse brand terms (supports clean slugs e.g. raspberry-pi or raw names e.g. Raspberry Pi)
     let brandList = [];
     if (brand) {
-      brandList = brand.split(',').map(b => b.trim()).filter(Boolean);
+      const rawBrandTerms = brand.split(',').map(b => b.trim()).filter(Boolean);
+      if (rawBrandTerms.length > 0) {
+        const [dbBrands] = await pool.query('SELECT DISTINCT brand FROM products WHERE brand IS NOT NULL');
+        for (const term of rawBrandTerms) {
+          const simplified = simplifyString(term);
+          const matched = dbBrands.filter(b =>
+            b.brand.toLowerCase() === term.toLowerCase() ||
+            simplifyString(b.brand) === simplified
+          );
+          if (matched.length > 0) {
+            matched.forEach(m => brandList.push(m.brand));
+          } else {
+            brandList.push(term);
+          }
+        }
+        brandList = [...new Set(brandList)];
+      }
     }
 
     // Assemble unified category/subcategory/brand WHERE conditions
@@ -311,15 +327,69 @@ class ProductModel {
       }
     }
 
-    // Family filter: support family_id (int) or name (string)
+    // Family filter: support family_id (int), name (string), clean slug (e.g. single-board-computers), or comma-separated list
     if (family) {
-      const familyId = parseInt(family, 10);
-      if (!isNaN(familyId)) {
-        whereClauses.push('p.family_id = ?');
-        queryParams.push(familyId);
-      } else {
-        whereClauses.push('pf.name = ?');
-        queryParams.push(family);
+      const familyTerms = family.toString().split(',').map(f => f.trim()).filter(Boolean);
+      if (familyTerms.length > 0) {
+        const [families] = await pool.query('SELECT id, name FROM product_families');
+        const familyIds = [];
+        for (const term of familyTerms) {
+          const fid = parseInt(term, 10);
+          if (!isNaN(fid) && fid.toString() === term) {
+            familyIds.push(fid);
+          } else {
+            const simplified = simplifyString(term);
+            const matched = families.filter(f =>
+              f.name.toLowerCase() === term.toLowerCase() ||
+              simplifyString(f.name) === simplified
+            );
+            matched.forEach(m => familyIds.push(m.id));
+          }
+        }
+        if (familyIds.length > 0) {
+          const uniqueFamIds = [...new Set(familyIds)];
+          whereClauses.push(`p.family_id IN (${uniqueFamIds.map(() => '?').join(', ')})`);
+          queryParams.push(...uniqueFamIds);
+        }
+      }
+    }
+
+    // Common attribute filter: stock_status (in_stock, out_of_stock, on_backorder)
+    if (stock_status) {
+      const statuses = stock_status.toString().split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      if (statuses.length > 0) {
+        whereClauses.push(`p.stock_status IN (${statuses.map(() => '?').join(', ')})`);
+        queryParams.push(...statuses);
+      }
+    }
+
+    // Dynamic Product Family Config filters: filter_options (comma-separated option IDs)
+    if (filter_options) {
+      const optIds = filter_options.toString().split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
+      if (optIds.length > 0) {
+        // Group option IDs by filter_id
+        const [optRecords] = await pool.query(
+          `SELECT id, filter_id FROM filter_options WHERE id IN (${optIds.map(() => '?').join(', ')})`,
+          optIds
+        );
+        const filterGroups = new Map();
+        for (const r of optRecords) {
+          if (!filterGroups.has(r.filter_id)) {
+            filterGroups.set(r.filter_id, []);
+          }
+          filterGroups.get(r.filter_id).push(r.id);
+        }
+
+        // For each filter group (e.g., Power, Lead-Free), match products that have at least one chosen option
+        for (const [filterId, groupOptIds] of filterGroups.entries()) {
+          whereClauses.push(`
+            p.id IN (
+              SELECT pfv.product_id FROM product_filter_values pfv
+              WHERE pfv.filter_id = ? AND pfv.option_id IN (${groupOptIds.map(() => '?').join(', ')})
+            )
+          `);
+          queryParams.push(filterId, ...groupOptIds);
+        }
       }
     }
 
@@ -459,10 +529,96 @@ class ProductModel {
     await connection.query(insertSql, [valuesData]);
   }
 
-  static async getBrands() {
-    const [rows] = await pool.query(
-      'SELECT DISTINCT brand FROM products ORDER BY brand ASC'
-    );
+  static async getBrands(filters = {}) {
+    const { category, subcategory, family } = filters;
+    let query = `
+      SELECT DISTINCT p.brand 
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN subcategories s ON p.subcategory_id = s.id
+      LEFT JOIN product_families f ON p.family_id = f.id
+      WHERE p.brand IS NOT NULL AND p.brand != ''
+    `;
+    const params = [];
+
+    const simplifyString = (str) => {
+      return str
+        .toString()
+        .toLowerCase()
+        .replace(/\band\b/g, '')
+        .replace(/[^a-z0-9]/g, '');
+    };
+
+    if (family) {
+      const familyList = family.split(',').map(f => f.trim()).filter(Boolean);
+      if (familyList.length > 0) {
+        const [families] = await pool.query('SELECT id, name FROM product_families');
+        const familyIds = [];
+        for (const famTerm of familyList) {
+          const simplified = simplifyString(famTerm);
+          const matched = families.filter(f => 
+            f.name.toLowerCase() === famTerm.toLowerCase() ||
+            simplifyString(f.name) === simplified ||
+            f.id.toString() === famTerm
+          );
+          matched.forEach(m => familyIds.push(m.id));
+        }
+
+        if (familyIds.length > 0) {
+          query += ` AND p.family_id IN (${familyIds.map(() => '?').join(', ')})`;
+          params.push(...familyIds);
+        } else {
+          query += ` AND p.family_id IN (${familyList.map(() => '?').join(', ')})`;
+          params.push(...familyList);
+        }
+      }
+    }
+
+    if (subcategory) {
+      const subList = subcategory.split(',').map(s => s.trim()).filter(Boolean);
+      if (subList.length > 0) {
+        const [subcats] = await pool.query('SELECT id, name FROM subcategories');
+        const subIds = [];
+        for (const subTerm of subList) {
+          const simplified = simplifyString(subTerm);
+          const matched = subcats.filter(s =>
+            s.name.toLowerCase() === subTerm.toLowerCase() ||
+            simplifyString(s.name) === simplified ||
+            s.id.toString() === subTerm
+          );
+          matched.forEach(m => subIds.push(m.id));
+        }
+        if (subIds.length > 0) {
+          query += ` AND p.subcategory_id IN (${subIds.map(() => '?').join(', ')})`;
+          params.push(...subIds);
+        }
+      }
+    }
+
+    if (category) {
+      const catList = category.split(',').map(c => c.trim()).filter(Boolean);
+      if (catList.length > 0) {
+        const [cats] = await pool.query('SELECT id, name FROM categories');
+        const catIds = [];
+        for (const catTerm of catList) {
+          const simplified = simplifyString(catTerm);
+          const matched = cats.filter(c =>
+            c.name.toLowerCase() === catTerm.toLowerCase() ||
+            simplifyString(c.name) === simplified ||
+            c.id.toString() === catTerm
+          );
+          matched.forEach(m => catIds.push(m.id));
+        }
+        if (catIds.length > 0) {
+          query += ` AND p.category_id IN (${catIds.map(() => '?').join(', ')})`;
+          params.push(...catIds);
+        }
+      }
+    }
+
+    query += ' ORDER BY p.brand ASC';
+
+    const [rows] = await pool.query(query, params);
     return rows.map(r => r.brand).filter(Boolean);
   }
 }

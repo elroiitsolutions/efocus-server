@@ -5,6 +5,7 @@ const { validateId } = require('../middleware/validation.middleware');
 const router = express.Router();
 
 router.get('/', FilterController.getAllFilters);
+router.get('/context', FilterController.getFiltersByContext);
 router.get('/:familyId', validateId('familyId'), FilterController.getFiltersByFamilyId);
 router.post('/', FilterController.createFilter);
 router.put('/:id', validateId('id'), FilterController.updateFilter);

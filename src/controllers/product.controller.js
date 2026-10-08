@@ -5,7 +5,7 @@ const { sendSuccess } = require('../utils/response');
 class ProductController {
   static async getProducts(req, res, next) {
     try {
-      const { search, category, subcategory, family, brand } = req.query;
+      const { search, category, subcategory, family, brand, stock_status, filter_options } = req.query;
       const { page, limit, offset } = getPaginationParams(req.query);
 
       const { rows, total } = await ProductService.getProducts({
@@ -14,6 +14,8 @@ class ProductController {
         subcategory,
         family,
         brand,
+        stock_status,
+        filter_options,
         limit,
         offset
       });
@@ -63,7 +65,7 @@ class ProductController {
 
   static async getBrands(req, res, next) {
     try {
-      const brands = await ProductService.getBrands();
+      const brands = await ProductService.getBrands(req.query);
       return sendSuccess(res, brands);
     } catch (error) {
       next(error);

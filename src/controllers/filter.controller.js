@@ -11,6 +11,15 @@ class FilterController {
     }
   }
 
+  static async getFiltersByContext(req, res, next) {
+    try {
+      const filters = await FilterService.getFiltersByContext(req.query);
+      return sendSuccess(res, filters);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getFiltersByFamilyId(req, res, next) {
     try {
       const filters = await FilterService.getFiltersByFamilyId(req.params.familyId);

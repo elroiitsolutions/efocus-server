@@ -255,8 +255,8 @@ class ProductService {
     return formattedSpecs;
   }
 
-  static async getBrands() {
-    return await ProductModel.getBrands();
+  static async getBrands(filters = {}) {
+    return await ProductModel.getBrands(filters);
   }
 }
 
