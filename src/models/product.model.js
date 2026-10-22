@@ -24,11 +24,14 @@ class ProductModel {
     const whereClauses = [];
     const queryParams = [];
 
-    // Search against product_name, sku, catalog_number, and brand
-    if (search) {
-      whereClauses.push('(p.product_name LIKE ? OR p.sku LIKE ? OR p.catalog_number LIKE ? OR p.brand LIKE ?)');
-      const term = `%${search}%`;
-      queryParams.push(term, term, term, term);
+    // Search against product_name, sku, catalog_number, brand, subcategory, and category
+    if (search && search.trim()) {
+      const searchTerms = search.trim().split(/\s+/).filter(Boolean);
+      for (const st of searchTerms) {
+        whereClauses.push('(p.product_name LIKE ? OR p.sku LIKE ? OR p.catalog_number LIKE ? OR p.brand LIKE ? OR s.name LIKE ? OR c.name LIKE ?)');
+        const term = `%${st}%`;
+        queryParams.push(term, term, term, term, term, term);
+      }
     }
 
     const simplifyString = (str) => {
@@ -399,14 +402,35 @@ class ProductModel {
       countSql += whereSql;
     }
 
-    // Sort by id descending
-    selectSql += ' ORDER BY p.id DESC LIMIT ? OFFSET ?';
+    // Sort category-wise in the same order as categories listed in the filter sidebar
+    if (search && search.trim()) {
+      selectSql += ' ORDER BY p.id DESC LIMIT ? OFFSET ?';
+    } else {
+      selectSql += ' ORDER BY c.priority DESC, c.category_no ASC, s.name ASC, p.id ASC LIMIT ? OFFSET ?';
+    }
 
     const countParams = [...queryParams];
     const selectParams = [...queryParams, limit, offset];
 
     const [[{ total }]] = await pool.query(countSql, countParams);
     const [rows] = await pool.query(selectSql, selectParams);
+
+    // Attach gallery images for products in the current page
+    if (rows.length > 0) {
+      const productIds = rows.map(r => r.id);
+      const [allImages] = await pool.query(
+        'SELECT product_id, image_url FROM product_images WHERE product_id IN (?) ORDER BY sort_order ASC',
+        [productIds]
+      );
+      const imagesByProduct = {};
+      for (const img of allImages) {
+        if (!imagesByProduct[img.product_id]) imagesByProduct[img.product_id] = [];
+        imagesByProduct[img.product_id].push(img.image_url);
+      }
+      for (const row of rows) {
+        row.images = imagesByProduct[row.id] || (row.primary_image ? [row.primary_image] : []);
+      }
+    }
 
     return { rows, total };
   }
@@ -448,24 +472,32 @@ class ProductModel {
     return rows;
   }
 
+  static async getProductImages(productId) {
+    const [rows] = await pool.query(
+      'SELECT image_url, is_primary, sort_order FROM product_images WHERE product_id = ? ORDER BY sort_order ASC',
+      [productId]
+    );
+    return rows.map(r => r.image_url);
+  }
+
   static async create(productData, connection = pool) {
     const {
       category_id, subcategory_id, family_id,
       sku, catalog_number = null, product_name, brand,
       short_description = null, key_spec_1 = null, key_spec_2 = null, key_spec_3 = null,
-      image_status = null, rfq_eligible = true
+      image_status = null, primary_image = null, rfq_eligible = true
     } = productData;
 
     const [result] = await connection.query(
       `INSERT INTO products 
        (category_id, subcategory_id, family_id, sku, catalog_number, product_name, brand, 
-        short_description, key_spec_1, key_spec_2, key_spec_3, image_status, rfq_eligible) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        short_description, key_spec_1, key_spec_2, key_spec_3, image_status, primary_image, rfq_eligible) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         category_id, subcategory_id, family_id,
         sku, catalog_number, product_name, brand,
         short_description, key_spec_1, key_spec_2, key_spec_3,
-        image_status, rfq_eligible ? 1 : 0
+        image_status, primary_image, rfq_eligible ? 1 : 0
       ]
     );
     return result.insertId;
@@ -476,7 +508,7 @@ class ProductModel {
       category_id, subcategory_id, family_id,
       sku, catalog_number, product_name, brand,
       short_description, key_spec_1, key_spec_2, key_spec_3,
-      image_status, rfq_eligible
+      image_status, primary_image, rfq_eligible
     } = productData;
 
     await connection.query(
@@ -484,13 +516,13 @@ class ProductModel {
        category_id = ?, subcategory_id = ?, family_id = ?, 
        sku = ?, catalog_number = ?, product_name = ?, brand = ?, 
        short_description = ?, key_spec_1 = ?, key_spec_2 = ?, key_spec_3 = ?, 
-       image_status = ?, rfq_eligible = ? 
+       image_status = ?, primary_image = ?, rfq_eligible = ? 
        WHERE id = ?`,
       [
         category_id, subcategory_id, family_id,
         sku, catalog_number, product_name, brand,
         short_description, key_spec_1, key_spec_2, key_spec_3,
-        image_status, rfq_eligible ? 1 : 0,
+        image_status, primary_image, rfq_eligible ? 1 : 0,
         id
       ]
     );

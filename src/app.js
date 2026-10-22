@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -17,8 +18,13 @@ const filterRoutes = require('./routes/filter.routes');
 const app = express();
 
 // Security Middlewares
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(cors("*"));
+
+// Static assets serving (Product Images & Uploads)
+app.use('/images', express.static(path.join(__dirname, '../public/images')));
 
 // Rate Limiting (Capped at 100 requests per 15 minutes per IP)
 const limiter = rateLimit({

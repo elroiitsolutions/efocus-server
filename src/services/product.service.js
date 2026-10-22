@@ -24,6 +24,10 @@ class ProductService {
     const specs = await ProductModel.getProductSpecs(id);
     product.specs = specs;
 
+    // Attach gallery images
+    const images = await ProductModel.getProductImages(id);
+    product.images = images.length > 0 ? images : (product.primary_image ? [product.primary_image] : []);
+
     return product;
   }
 
