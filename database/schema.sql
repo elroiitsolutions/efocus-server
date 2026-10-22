@@ -62,6 +62,7 @@ CREATE TABLE `products` (
   `key_spec_2` VARCHAR(255) NULL,
   `key_spec_3` VARCHAR(255) NULL,
   `image_status` VARCHAR(50) NULL,
+  `primary_image` VARCHAR(500) NULL,
   `rfq_eligible` BOOLEAN DEFAULT TRUE,
   `stock_status` ENUM('in_stock', 'out_of_stock', 'on_backorder') DEFAULT 'in_stock',
   `is_active` BOOLEAN DEFAULT TRUE,
@@ -70,6 +71,17 @@ CREATE TABLE `products` (
   CONSTRAINT `fk_products_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_products_subcategory` FOREIGN KEY (`subcategory_id`) REFERENCES `subcategories` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_products_family` FOREIGN KEY (`family_id`) REFERENCES `product_families` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4b. Product Images (Multi-image/gallery support)
+CREATE TABLE IF NOT EXISTS `product_images` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `product_id` INT NOT NULL,
+  `image_url` VARCHAR(500) NOT NULL,
+  `is_primary` BOOLEAN DEFAULT FALSE,
+  `sort_order` INT DEFAULT 0,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT `fk_product_images_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Indexes for Products
