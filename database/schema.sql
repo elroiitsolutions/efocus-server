@@ -134,3 +134,30 @@ CREATE TABLE `product_filter_values` (
   CONSTRAINT `fk_filter_values_option` FOREIGN KEY (`option_id`) REFERENCES `filter_options` (`id`) ON DELETE SET NULL,
   UNIQUE KEY `uq_product_filter_option` (`product_id`, `filter_id`, `option_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 8. Form Submissions (Inquiries, RFQs, Contact, Product Sourcing Requests)
+CREATE TABLE IF NOT EXISTS `form_submissions` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `form_name` VARCHAR(100) NOT NULL,
+  `form_type` VARCHAR(50) NOT NULL,
+  `name` VARCHAR(255) NULL,
+  `email` VARCHAR(255) NOT NULL,
+  `company_name` VARCHAR(255) NULL,
+  `phone` VARCHAR(50) NULL,
+  `subject` VARCHAR(255) NULL,
+  `message` TEXT NULL,
+  `part_numbers` TEXT NULL,
+  `skus` TEXT NULL,
+  `quantity` VARCHAR(100) NULL,
+  `attachment_url` VARCHAR(500) NULL,
+  `attachment_name` VARCHAR(255) NULL,
+  `form_data` JSON NULL,
+  `status` ENUM('new', 'contacted', 'quoted', 'closed') DEFAULT 'new',
+  `ip_address` VARCHAR(45) NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_form_name` (`form_name`),
+  INDEX `idx_form_type` (`form_type`),
+  INDEX `idx_email` (`email`),
+  INDEX `idx_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
