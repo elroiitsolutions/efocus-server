@@ -14,6 +14,7 @@ const subcategoryRoutes = require('./routes/subcategory.routes');
 const familyRoutes = require('./routes/family.routes');
 const productRoutes = require('./routes/product.routes');
 const filterRoutes = require('./routes/filter.routes');
+const formSubmissionRoutes = require('./routes/formSubmission.routes');
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use(cors("*"));
 
 // Static assets serving (Product Images & Uploads)
 app.use('/images', express.static(path.join(__dirname, '../public/images')));
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 // Rate Limiting (Capped at 100 requests per 15 minutes per IP)
 const limiter = rateLimit({
@@ -69,6 +71,7 @@ app.use('/api/subcategories', subcategoryRoutes);
 app.use('/api/families', familyRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/filters', filterRoutes);
+app.use('/api/forms', formSubmissionRoutes);
 
 // Unmatched Route (404) Handler
 app.use(notFoundMiddleware);
