@@ -12,7 +12,7 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Multer storage configuration
+// Multer storage configuration with sanitized unique naming
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
@@ -24,14 +24,14 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter (XLSX, XLS, CSV, PDF up to 25MB)
+// File filter (Excel, CSV, PDF, Word, Zip up to 25MB)
 const fileFilter = (req, file, cb) => {
-  const allowedExtensions = ['.xlsx', '.xls', '.csv', '.pdf'];
+  const allowedExtensions = ['.xlsx', '.xls', '.csv', '.pdf', '.doc', '.docx', '.zip'];
   const ext = path.extname(file.originalname).toLowerCase();
   if (allowedExtensions.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only Excel (.xlsx, .xls), CSV, and PDF files are allowed.'), false);
+    cb(new Error('Invalid file type. Supported formats: .xlsx, .xls, .csv, .pdf, .doc, .docx, .zip'), false);
   }
 };
 
@@ -41,10 +41,15 @@ const upload = multer({
   fileFilter
 });
 
-// Middleware to handle multer upload or fallback to standard body
+// Flexible upload middleware accepting 'bom_file', 'file', or 'attachment'
 const handleFileUpload = (req, res, next) => {
-  const uploadSingle = upload.single('bom_file');
-  uploadSingle(req, res, (err) => {
+  const uploadMulti = upload.fields([
+    { name: 'bom_file', maxCount: 1 },
+    { name: 'file', maxCount: 1 },
+    { name: 'attachment', maxCount: 1 }
+  ]);
+
+  uploadMulti(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({
@@ -56,14 +61,36 @@ const handleFileUpload = (req, res, next) => {
     } else if (err) {
       return res.status(400).json({ success: false, message: err.message });
     }
+
+    // Normalize req.file from any of the allowed field names
+    if (req.files) {
+      req.file = req.files.bom_file?.[0] || req.files.file?.[0] || req.files.attachment?.[0] || null;
+    }
+
     next();
   });
 };
 
-// POST /api/forms/submit - Submit any form
+// ==========================================
+// FORM SUBMISSION ROUTES
+// ==========================================
+
+// 1. Submit any form (Procurement, RFQ, Industry, Services, Quote)
 router.post('/submit', handleFileUpload, FormSubmissionController.submitForm);
 
-// GET /api/forms/submissions - View all submissions
+// 2. View all submissions with filters & pagination
 router.get('/submissions', FormSubmissionController.getSubmissions);
+
+// 3. View submission summary stats
+router.get('/stats', FormSubmissionController.getStats);
+
+// 4. View single submission by ID or Reference Number
+router.get('/submissions/:id', FormSubmissionController.getSubmissionById);
+
+// 5. Update submission status (new -> under_review -> quote_sent -> won -> lost -> closed)
+router.patch('/submissions/:id/status', FormSubmissionController.updateStatus);
+
+// 6. Update internal engineering notes
+router.post('/submissions/:id/notes', FormSubmissionController.updateNotes);
 
 module.exports = router;
