@@ -15,5 +15,14 @@ module.exports = {
     database: process.env.DB_NAME || 'efocus_ecommerce',
     connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT, 10) || 10,
     waitForConnections: process.env.DB_WAIT_FOR_CONNECTIONS === 'true',
+  },
+  smtp: {
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT, 10) || 587,
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.SMTP_FROM || '"eFocus Industrial" <sales@efocus.in>',
+    adminEmail: process.env.ADMIN_NOTIFICATION_EMAIL || 'sales@efocus.in'
   }
 };
