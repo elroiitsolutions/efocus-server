@@ -1,7 +1,7 @@
 const { pool } = require('../config/database');
 
 class ProductModel {
-  static async findAndCount({ search, category, subcategory, family, brand, stock_status, filter_options, limit, offset }) {
+  static async findAndCount({ search, category, subcategory, family, brand, stock_status, filter_options, limit = 20, offset = 0 } = {}) {
     let selectSql = `
       SELECT p.*, 
              c.name AS category_name, c.category_no AS category_no,
@@ -417,18 +417,25 @@ class ProductModel {
 
     // Attach gallery images for products in the current page
     if (rows.length > 0) {
-      const productIds = rows.map(r => r.id);
-      const [allImages] = await pool.query(
-        'SELECT product_id, image_url FROM product_images WHERE product_id IN (?) ORDER BY sort_order ASC',
-        [productIds]
-      );
-      const imagesByProduct = {};
-      for (const img of allImages) {
-        if (!imagesByProduct[img.product_id]) imagesByProduct[img.product_id] = [];
-        imagesByProduct[img.product_id].push(img.image_url);
-      }
-      for (const row of rows) {
-        row.images = imagesByProduct[row.id] || (row.primary_image ? [row.primary_image] : []);
+      try {
+        const productIds = rows.map(r => r.id);
+        const [allImages] = await pool.query(
+          'SELECT product_id, image_url FROM product_images WHERE product_id IN (?) ORDER BY sort_order ASC',
+          [productIds]
+        );
+        const imagesByProduct = {};
+        for (const img of allImages) {
+          if (!imagesByProduct[img.product_id]) imagesByProduct[img.product_id] = [];
+          imagesByProduct[img.product_id].push(img.image_url);
+        }
+        for (const row of rows) {
+          row.images = imagesByProduct[row.id] || (row.primary_image ? [row.primary_image] : []);
+        }
+      } catch (imgErr) {
+        console.warn('[ProductModel] Warning: Could not fetch gallery images from product_images table:', imgErr.message);
+        for (const row of rows) {
+          row.images = row.primary_image ? [row.primary_image] : [];
+        }
       }
     }
 
@@ -473,11 +480,16 @@ class ProductModel {
   }
 
   static async getProductImages(productId) {
-    const [rows] = await pool.query(
-      'SELECT image_url, is_primary, sort_order FROM product_images WHERE product_id = ? ORDER BY sort_order ASC',
-      [productId]
-    );
-    return rows.map(r => r.image_url);
+    try {
+      const [rows] = await pool.query(
+        'SELECT image_url, is_primary, sort_order FROM product_images WHERE product_id = ? ORDER BY sort_order ASC',
+        [productId]
+      );
+      return rows.map(r => r.image_url);
+    } catch (err) {
+      console.warn(`[ProductModel] Warning: Could not fetch images for product ${productId}:`, err.message);
+      return [];
+    }
   }
 
   static async create(productData, connection = pool) {

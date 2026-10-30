@@ -81,6 +81,40 @@ async function ensureTables() {
       `);
       console.log('[Auto-Init] Table upgraded with all extended columns successfully.');
     }
+
+    // 2. Ensure product_images table exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`product_images\` (
+        \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+        \`product_id\` INT NOT NULL,
+        \`image_url\` VARCHAR(500) NOT NULL,
+        \`is_primary\` BOOLEAN DEFAULT FALSE,
+        \`sort_order\` INT DEFAULT 0,
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX \`idx_product_images_product_id\` (\`product_id\`),
+        CONSTRAINT \`fk_product_images_product\` FOREIGN KEY (\`product_id\`) REFERENCES \`products\` (\`id\`) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 3. Ensure primary_image column exists on products
+    const [pCols] = await pool.query(`
+      SELECT COLUMN_NAME 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_SCHEMA = DATABASE() 
+        AND TABLE_NAME = 'products' 
+        AND COLUMN_NAME = 'primary_image'
+    `);
+    if (pCols.length === 0) {
+      await pool.query('ALTER TABLE `products` ADD COLUMN `primary_image` VARCHAR(500) NULL AFTER `image_status`');
+    }
+
+    // 4. Seed product_images if table is empty
+    const [[{ imgCount }]] = await pool.query('SELECT COUNT(*) as imgCount FROM `product_images`');
+    if (imgCount === 0) {
+      console.log('[Auto-Init] `product_images` table is empty. Automatically migrating authentic images...');
+      const { migrateProductImages } = require('../../scripts/migrate_product_images');
+      await migrateProductImages();
+    }
   } catch (err) {
     console.error('[Auto-Init] Warning: Could not auto-initialize tables:', err.message);
   }
