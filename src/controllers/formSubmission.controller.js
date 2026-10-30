@@ -13,6 +13,8 @@ const FORM_NAME_MAP = {
   electronics_ems_sourcing: 'Electronics & EMS Production Sourcing Enquiry',
   automotive_ev_sourcing: 'Automotive & EV Testing Sourcing Enquiry',
   aerospace_defence_sourcing: 'Aerospace & Defence Test Equipment Enquiry',
+  semiconductor_test_sourcing: 'Semiconductor Test & Measurement Enquiry',
+  semiconductor_sourcing: 'Semiconductor Test & Measurement Enquiry',
   services_enquiry: 'Engineering Support Service Enquiry',
   quick_procurement: 'Quick Procurement Desk',
   contact_sales: 'Contact Direct Sales',
