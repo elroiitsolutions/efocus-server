@@ -17,6 +17,8 @@ class FormSubmissionModel {
     else if (formType.includes('semi')) prefix = 'EF-SEMI';
     else if (formType.includes('telecom') || formType.includes('rf')) prefix = 'EF-RF';
     else if (formType.includes('power') || formType.includes('energy')) prefix = 'EF-PWR';
+    else if (formType.includes('automation') || formType.includes('plc') || formType.includes('ia')) prefix = 'EF-IA';
+    else if (formType.includes('pharma') || formType.includes('medical') || formType.includes('med')) prefix = 'EF-MED';
     else if (formType.includes('service')) prefix = 'EF-SRV';
     else if (formType.includes('quote')) prefix = 'EF-QUO';
 
@@ -31,7 +33,20 @@ class FormSubmissionModel {
     if (formType.includes('bom') || formType.includes('rate') || formType.includes('vendor') || formType.includes('project') || formType.includes('workstation') || formType.includes('procurement')) {
       return 'procurement';
     }
-    if (formType.includes('electronics') || formType.includes('automotive') || formType.includes('aerospace') || formType.includes('semi') || formType.includes('telecom') || formType.includes('rf') || formType.includes('power') || formType.includes('energy') || formType.includes('industry')) {
+    if (
+      formType.includes('electronics') || 
+      formType.includes('automotive') || 
+      formType.includes('aerospace') || 
+      formType.includes('semi') || 
+      formType.includes('telecom') || 
+      formType.includes('rf') || 
+      formType.includes('power') || 
+      formType.includes('energy') || 
+      formType.includes('automation') || 
+      formType.includes('pharma') || 
+      formType.includes('medical') || 
+      formType.includes('industry')
+    ) {
       return 'industry';
     }
     if (formType.includes('service')) {
