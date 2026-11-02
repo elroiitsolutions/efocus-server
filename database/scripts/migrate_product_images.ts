@@ -1,5 +1,5 @@
 import { pool } from '../../src/config/database';
-import { getProductPrimaryImage, getProductThumbnails } from '../../../client/src/features/products/utils/productImages';
+import { getProductPrimaryImage, getProductThumbnails } from '../../scripts/productImageMatcher';
 
 async function migrateProductImages() {
   console.log('🚀 Starting Product Images Migration...');

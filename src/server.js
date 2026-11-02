@@ -1,6 +1,7 @@
 const app = require('./app');
 const env = require('./config/env');
 const { checkConnection } = require('./config/database');
+const { ensureTables } = require('./config/initDb');
 
 /**
  * Bootstrap and start the backend service.
@@ -14,6 +15,9 @@ async function startServer() {
   const dbConnected = await checkConnection();
   if (!dbConnected) {
     console.warn('WARNING: Running in degraded state because the database is currently unreachable.');
+  } else {
+    // Automatically ensure all tables and columns exist
+    await ensureTables();
   }
 
   const server = app.listen(env.port, () => {
